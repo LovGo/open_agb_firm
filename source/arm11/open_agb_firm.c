@@ -333,9 +333,19 @@ Result oafInitAndRun(void)
 
 				// Setup button overrides.
 				const u32 *const maps = g_oafConfig.buttonMaps;
+				const u32 *const comboMaps = g_oafConfig.buttonComboMap;
 				u16 overrides = 0;
+
 				for(unsigned i = 0; i < 10; i++)
+				{
 					if(maps[i] != 0) overrides |= 1u<<i;
+				}
+
+				for(unsigned i = 0; i < 32; i++)
+				{
+					if(comboMaps[i] != 0) overrides |= comboMaps[i] & 0x3FF;
+				}
+
 				LGY11_selectInput(overrides);
 
 				// Sync LgyCap start with LCD VBlank.
@@ -354,12 +364,21 @@ Result oafInitAndRun(void)
 void oafUpdate(void)
 {
 	const u32 *const maps = g_oafConfig.buttonMaps;
+    const u32 *const comboMaps = g_oafConfig.buttonComboMap;
 	const u32 kHeld = hidKeysHeld();
 	u16 pressed = 0;
+
 	for(unsigned i = 0; i < 10; i++)
 	{
-		if((kHeld & maps[i]) != 0)
-			pressed |= 1u<<i;
+		// Use remapping if exists, otherwise direct mapping
+		const u32 buttonMask = maps[i] != 0 ? maps[i] : (1u << i);
+		if(kHeld & buttonMask) pressed |= 1u << i;
+	}
+
+	// Handle combo mappings
+	for(unsigned i = 0; i < 32; i++)
+	{
+		if((kHeld & (1u << i)) && comboMaps[i] != 0) pressed |= comboMaps[i] & 0x3FF;
 	}
 	LGY11_setInputState(pressed);
 

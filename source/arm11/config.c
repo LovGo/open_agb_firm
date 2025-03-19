@@ -85,6 +85,13 @@ OafConfig g_oafConfig =
 		0  // L
 	},
 
+	{      // buttonComboMap
+		0, 0, 0, 0, 0, 0, 0, 0,  // A,B,SELECT,START,RIGHT,LEFT,UP,DOWN
+		0, 0, 0, 0, 0, 0, 0, 0,  // R,L,X,Y,_,_,ZL,ZR
+		0, 0, 0, 0, 0, 0, 0, 0,  // _,_,_,_,TOUCH,_,_,_
+		0, 0, 0, 0, 0, 0, 0, 0   // CS_RIGHT,CS_LEFT,CS_UP,CS_DOWN,CP_RIGHT,CP_LEFT,CP_UP,CP_DOWN
+	},
+
 	// [game]
 	0,     // saveSlot
 	255,   // saveType
@@ -94,6 +101,20 @@ OafConfig g_oafConfig =
 	14     // defaultSave
 };
 
+
+static int findButton(const char* button, const char *const buttonStrLut[32])
+{
+    if(button == NULL || button[0] == '\0') return 0;
+
+    for(unsigned i = 0; i < 32; i++)
+    {
+        if(buttonStrLut[i][0] != '\0' && strcmp(buttonStrLut[i], button) == 0)
+        {
+            return 1u << i;
+        }
+    }
+    return 0;
+}
 
 
 static u32 parseButtons(const char *str)
@@ -112,23 +133,16 @@ static u32 parseButtons(const char *str)
 		"", "", "", "", "TOUCH", "", "", "",
 		"CS_RIGHT", "CS_LEFT", "CS_UP", "CS_DOWN", "CP_RIGHT", "CP_LEFT", "CP_UP", "CP_DOWN"
 	};
+
 	u32 map = 0;
-	while(1)
-	{
-		char *const nextDelimiter = strchr(bufPtr, ',');
-		if(nextDelimiter != NULL) *nextDelimiter = '\0';
+    char *token = strtok(buf, "+,");
+    while(token)
+    {
+        // Only process non-empty tokens
+        if(*token != '\0') map |= findButton(token, buttonStrLut);
+        token = strtok(NULL, "+,");
+    }
 
-		unsigned i = 0;
-		while(i < 32 && strcmp(buttonStrLut[i], bufPtr) != 0) ++i;
-		if(i == 32) break;
-		map |= 1u<<i;
-
-		if(nextDelimiter == NULL) break;
-
-		bufPtr = nextDelimiter + 1; // Skip delimiter.
-	}
-
-	// Empty strings will match the entry for bit 12.
 	return map & ~(1u<<12);
 }
 
@@ -206,13 +220,27 @@ static int cfgIniCallback(void *user, const char *section, const char *name, con
 	}
 	else if(strcmp(section, "input") == 0)
 	{
-		const u32 button = parseButtons(name) & 0x3FFu; // Only allow GBA buttons.
-		if(button != 0)
+		const u32 map = parseButtons(value);  // Parse 3DS buttons (right side in config)
+		if(map != 0)
 		{
-			// If the config option happens to abuse parseButtons() we will only use the highest bit.
-			const u32 shift = 31u - __builtin_clzl(button);
-			const u32 map   = parseButtons(value);
+			const u32 buttons = parseButtons(name) & 0x3FFu;  // Parse GBA buttons & only allow GBA buttons (left side in config)
+			if(buttons != 0)
+		{
+				// Combination mapping
+				if(strchr(name, '+') != NULL)
+				{
+					for(int i = 0; i < 32; i++)
+					{
+						if(map & (1u << i)) config->buttonComboMap[i] = buttons;
+					}
+				}
+				else
+				{
+					// Single button mapping
+					const u32 shift = 31u - __builtin_clzl(buttons);
 			config->buttonMaps[shift] = map;
+				}
+			}
 		}
 	}
 	else if(strcmp(section, "game") == 0)

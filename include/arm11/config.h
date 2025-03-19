@@ -55,6 +55,7 @@ typedef struct
 
 	// [input]
 	u32 buttonMaps[10]; // A, B, Select, Start, Right, Left, Up, Down, R, L.
+	u32 buttonComboMap[32]; // Combination mappings, 1 bit per button including New 3DS buttons.
 
 	// [game]
 	u8 saveSlot;
